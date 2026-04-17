@@ -1,0 +1,5 @@
+{"sensorId":"AQ-WAW-01","timestamp":"2023-10-01T08:00:00Z","pm25":15.2,"pm10":22.4,"temperature":12.5,"humidity":60}
+{"sensorId":"AQ-WAW-01","timestamp":"2023-10-01T08:05:00Z","pm25":16.1,"pm10":24.0,"temperature":12.6,"humidity":59}
+{"sensorId":"AQ-WAW-01","timestamp":"2023-10-01T08:10:00Z","pm25":18.5,"pm10":27.8,"temperature":12.8,"humidity":58}
+{"sensorId":"AQ-WAW-01","timestamp":"2023-10-01T08:15:00Z","pm25":19.0,"pm10":28.1,"temperature":13.0,"humidity":55}
+{"sensorId":"AQ-WAW-01","timestamp":"2023-10-01T08:20:00Z","pm25":17.4,"pm10":25.5,"temperature":13.2,"humidity":54}

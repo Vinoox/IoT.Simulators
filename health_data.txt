@@ -1,0 +1,5 @@
+{"patientId":"PAT-9921","timestamp":"2023-10-01T09:00:00Z","heartRateBpm":72,"bloodOxygenPercent":98,"bodyTempCelsius":36.6,"status":"Resting"}
+{"patientId":"PAT-9921","timestamp":"2023-10-01T09:05:00Z","heartRateBpm":75,"bloodOxygenPercent":98,"bodyTempCelsius":36.6,"status":"Walking"}
+{"patientId":"PAT-9921","timestamp":"2023-10-01T09:10:00Z","heartRateBpm":110,"bloodOxygenPercent":97,"bodyTempCelsius":36.9,"status":"Running"}
+{"patientId":"PAT-9921","timestamp":"2023-10-01T09:15:00Z","heartRateBpm":135,"bloodOxygenPercent":96,"bodyTempCelsius":37.2,"status":"Running"}
+{"patientId":"PAT-9921","timestamp":"2023-10-01T09:20:00Z","heartRateBpm":95,"bloodOxygenPercent":98,"bodyTempCelsius":37.0,"status":"Cooling_Down"}

@@ -1,0 +1,5 @@
+{"vehicleId":"TRUCK-WPR-404","timestamp":"2023-10-01T14:00:00Z","latitude":52.2297,"longitude":21.0122,"speedKmh":45,"fuelLevelPercent":78,"engineRpm":1500}
+{"vehicleId":"TRUCK-WPR-404","timestamp":"2023-10-01T14:01:00Z","latitude":52.2305,"longitude":21.0135,"speedKmh":52,"fuelLevelPercent":78,"engineRpm":1650}
+{"vehicleId":"TRUCK-WPR-404","timestamp":"2023-10-01T14:02:00Z","latitude":52.2318,"longitude":21.0150,"speedKmh":60,"fuelLevelPercent":77,"engineRpm":1800}
+{"vehicleId":"TRUCK-WPR-404","timestamp":"2023-10-01T14:03:00Z","latitude":52.2330,"longitude":21.0175,"speedKmh":30,"fuelLevelPercent":77,"engineRpm":1200}
+{"vehicleId":"TRUCK-WPR-404","timestamp":"2023-10-01T14:04:00Z","latitude":52.2335,"longitude":21.0190,"speedKmh":0,"fuelLevelPercent":77,"engineRpm":800}

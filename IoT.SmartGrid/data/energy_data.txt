@@ -1,0 +1,5 @@
+{"meterId":"SM-GRID-883","timestamp":"2023-10-01T18:00:00Z","kwh":0.45,"voltage":229.5,"currentAmps":1.96}
+{"meterId":"SM-GRID-883","timestamp":"2023-10-01T18:15:00Z","kwh":0.85,"voltage":228.1,"currentAmps":3.72}
+{"meterId":"SM-GRID-883","timestamp":"2023-10-01T18:30:00Z","kwh":1.20,"voltage":227.4,"currentAmps":5.27}
+{"meterId":"SM-GRID-883","timestamp":"2023-10-01T18:45:00Z","kwh":0.60,"voltage":229.0,"currentAmps":2.62}
+{"meterId":"SM-GRID-883","timestamp":"2023-10-01T19:00:00Z","kwh":0.30,"voltage":230.1,"currentAmps":1.30}

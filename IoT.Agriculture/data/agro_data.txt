@@ -1,0 +1,5 @@
+{"fieldId":"FIELD-A-SOY","timestamp":"2023-10-01T06:00:00Z","soilMoisturePercent":32,"phLevel":6.5,"sunlightLux":450}
+{"fieldId":"FIELD-A-SOY","timestamp":"2023-10-01T07:00:00Z","soilMoisturePercent":31,"phLevel":6.5,"sunlightLux":1200}
+{"fieldId":"FIELD-A-SOY","timestamp":"2023-10-01T08:00:00Z","soilMoisturePercent":30,"phLevel":6.5,"sunlightLux":3500}
+{"fieldId":"FIELD-A-SOY","timestamp":"2023-10-01T09:00:00Z","soilMoisturePercent":28,"phLevel":6.5,"sunlightLux":8000}
+{"fieldId":"FIELD-A-SOY","timestamp":"2023-10-01T10:00:00Z","soilMoisturePercent":26,"phLevel":6.5,"sunlightLux":15000}
