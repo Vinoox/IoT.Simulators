@@ -1,28 +1,22 @@
 using IoT.Simulator.Core.Configuration;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Net.Http.Json;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Konfiguracja JSON, aby Enumy w Swaggerze by³y tekstami (MQTT/HTTP)
+// 1. Konfiguracja serializacji JSON dla Enumów
 builder.Services.ConfigureHttpJsonOptions(options => {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    options.SerializerOptions.PropertyNameCaseInsensitive = true; // Ignoruj wielkoœæ liter w nazwach pól
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
 });
 builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c => {
+    c.SwaggerDoc("v1", new() { Title = "IoT Control Panel", Version = "v2" });
+});
 builder.Services.AddHttpClient();
 
 var app = builder.Build();
@@ -30,65 +24,77 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Przekierowanie na swagger przy starcie
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
-
-// MAPA SERWISÓW (Porty symulatorów)
-var servicePorts = new Dictionary<TargetService, string>
-{
-    { TargetService.SmartCity, "http://localhost:5001" },
-    { TargetService.SmartGrid, "http://localhost:5002" },
-    { TargetService.Agriculture, "http://localhost:5003" },
-    { TargetService.Logistics, "http://localhost:5004" },
-    { TargetService.Healthcare, "http://localhost:5005" }
-};
 
 // ==========================================
 // ENDPOINT 1: ZMIANA INTERWA£U
 // ==========================================
-app.MapPost("/api/control/update-interval", async (TargetService service, int intervalMs, IHttpClientFactory clientFactory) =>
+app.MapPost("/api/control/update-interval", async (
+    TargetService service,
+    int intervalMs,
+    IHttpClientFactory clientFactory,
+    IConfiguration configuration) =>
 {
-    if (!servicePorts.TryGetValue(service, out var targetUrl))
-        return Results.NotFound($"Nie znaleziono portu dla {service}");
+    string? targetUrl = configuration.GetValue<string>($"ServiceUrls:{service}");
+    if (string.IsNullOrEmpty(targetUrl))
+        return Results.NotFound($"Nie znaleziono adresu dla {service} w appsettings.json");
 
-    Console.WriteLine($"[PANEL] Zmiana interwa³u dla {service} na {intervalMs}ms...");
-
-    return await UpdateRemoteConfig(service, targetUrl, clientFactory, config =>
+    return await UpdateRemoteConfig(targetUrl, clientFactory, config =>
     {
-        // PRZYPISANIE: To tutaj dzieje siê magia
         config.IntervalMilliseconds = intervalMs;
     });
 })
 .WithTags("Sterowanie")
-.WithSummary("Zmienia tylko czêstotliwoœæ (ms)");
+.WithSummary("Zmienia tylko czêstotliwoœæ nadawania (ms)");
 
 // ==========================================
-// ENDPOINT 2: ZMIANA PROTOKO£U (I sztywne adresy)
+// ENDPOINT 2A: PRZE£¥CZ NA HTTP (Opcja 2)
 // ==========================================
-app.MapPost("/api/control/switch-protocol", async (TargetService service, ProtocolType protocol, IHttpClientFactory clientFactory) =>
+app.MapPost("/api/control/switch-to-http", async (
+    TargetService service,
+    [DefaultValue("http://localhost:8080")] string targetAddress,
+    [DefaultValue("/api/collect/smartcity")] string apiPath,
+    IHttpClientFactory clientFactory,
+    IConfiguration configuration) =>
 {
-    if (!servicePorts.TryGetValue(service, out var targetUrl))
-        return Results.NotFound();
+    string? targetUrl = configuration.GetValue<string>($"ServiceUrls:{service}");
+    if (string.IsNullOrEmpty(targetUrl)) return Results.NotFound();
 
-    string finalAddress = protocol == ProtocolType.MQTT ? "localhost" : "http://localhost:8080";
-    string finalTopic = protocol == ProtocolType.MQTT
-        ? $"sensors/{service.ToString().ToLower()}"
-        : $"/api/collect/{service.ToString().ToLower()}";
-
-    Console.WriteLine($"[PANEL] Prze³¹czanie {service} na {protocol} ({finalAddress})...");
-
-    return await UpdateRemoteConfig(service, targetUrl, clientFactory, config =>
+    return await UpdateRemoteConfig(targetUrl, clientFactory, config =>
     {
-        config.Protocol = protocol.ToString();
-        config.TargetAddress = finalAddress;
-        config.TopicOrPath = finalTopic;
+        config.Protocol = "HTTP";
+        config.TargetAddress = targetAddress;
+        config.TopicOrPath = apiPath;
     });
 })
 .WithTags("Sterowanie")
-.WithSummary("Prze³¹cza protokó³ i ustawia sztywne adresy docelowe");
+.WithSummary("Konfiguruje wysy³kê danych przez protokó³ HTTP");
 
 // ==========================================
-// KOLEKTOR DANYCH (Odbiornik na porcie 8080)
+// ENDPOINT 2B: PRZE£¥CZ NA MQTT (Opcja 2)
+// ==========================================
+app.MapPost("/api/control/switch-to-mqtt", async (
+    TargetService service,
+    [DefaultValue("localhost")] string brokerAddress,
+    [DefaultValue("sensors/")] string topic,
+    IHttpClientFactory clientFactory,
+    IConfiguration configuration) =>
+{
+    string? targetUrl = configuration.GetValue<string>($"ServiceUrls:{service}");
+    if (string.IsNullOrEmpty(targetUrl)) return Results.NotFound();
+
+    return await UpdateRemoteConfig(targetUrl, clientFactory, config =>
+    {
+        config.Protocol = "MQTT";
+        config.TargetAddress = brokerAddress;
+        config.TopicOrPath = topic;
+    });
+})
+.WithTags("Sterowanie")
+.WithSummary("Konfiguruje wysy³kê danych przez protokó³ MQTT");
+
+// ==========================================
+// KOLEKTOR DANYCH (Odbiornik testowy)
 // ==========================================
 app.MapPost("/api/collect/{sector}", (string sector, object data, ILogger<Program> logger) =>
 {
@@ -100,43 +106,41 @@ app.MapPost("/api/collect/{sector}", (string sector, object data, ILogger<Progra
 app.Run();
 
 // ==========================================
-// LOGIKA POMOCNICZA (Pancerna)
+// LOGIKA POMOCNICZA (Zarz¹dzanie stanem zdalnym)
 // ==========================================
-async Task<IResult> UpdateRemoteConfig(TargetService service, string targetUrl, IHttpClientFactory factory, Action<SimulatorConfig> updateAction)
+async Task<IResult> UpdateRemoteConfig(string targetUrl, IHttpClientFactory factory, Action<SimulatorConfig> updateAction)
 {
     try
     {
         var client = factory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
 
-        // 1. Pobierz obecn¹ konfiguracjê z Symulatora
+        // 1. Pobranie obecnej konfiguracji
         var config = await client.GetFromJsonAsync<SimulatorConfig>($"{targetUrl}/api/config");
         if (config == null) return Results.Problem("Symulator zwróci³ pusty obiekt.");
 
-        // 2. Wykonaj aktualizacjê pól
+        // 2. Modyfikacja obiektu
         updateAction(config);
 
-        // 3. LOG DIAGNOSTYCZNY - SprawdŸ konsolê Panelu!
-        Console.WriteLine($"[PANEL] Wysy³am do {service}: Interval={config.IntervalMilliseconds}, Proto={config.Protocol}");
-
-        // 4. Odes³anie poprawionego obiektu
-        var response = await client.PostAsJsonAsync($"{targetUrl}/api/config", config);
+        // 3. Wys³anie zaktualizowanego stanu (PUT)
+        var response = await client.PutAsJsonAsync($"{targetUrl}/api/config", config);
 
         if (response.IsSuccessStatusCode)
         {
-            return Results.Ok(new { Message = "Zaktualizowano pomyœlnie", CurrentConfig = config });
+            return Results.Ok(new
+            {
+                Status = "Success",
+                AppliedConfig = config
+            });
         }
 
-        return Results.StatusCode((int)response.StatusCode);
+        var error = await response.Content.ReadAsStringAsync();
+        return Results.Problem(detail: error, statusCode: (int)response.StatusCode);
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[B£¥D PANELU] {ex.Message}");
-        return Results.Problem($"Symulator {service} na {targetUrl} nie odpowiada.");
+        return Results.Problem(detail: ex.Message, statusCode: 503);
     }
 }
 
-// ==========================================
-// MODELE
-// ==========================================
-public enum ProtocolType { MQTT, HTTP }
 public enum TargetService { SmartCity, SmartGrid, Agriculture, Logistics, Healthcare }

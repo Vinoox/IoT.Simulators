@@ -6,7 +6,6 @@ using IoT.Simulator.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Client;
-// Usunąłem niepotrzebny using Microsoft.Extensions.Options;
 
 namespace IoT.Simulator.Core.Senders;
 
@@ -15,17 +14,14 @@ public class MqttDataSender : IDataSender, IDisposable
     private readonly IMqttClient _mqttClient;
     private readonly SimulatorConfig _config;
     private readonly ILogger<MqttDataSender> _logger;
+    private string _lastConnectedAddress = string.Empty;
 
-    // 1. POPRAWKA: Prawidłowe wstrzykiwanie bezpośredniego obiektu (SimulatorConfig config)
     public MqttDataSender(SimulatorConfig config, ILogger<MqttDataSender> logger)
     {
         _config = config;
         _logger = logger;
-
         var factory = new MqttFactory();
         _mqttClient = factory.CreateMqttClient();
-
-        // 2. POPRAWKA: Usunąłem stąd budowanie opcji (_mqttOptions)
     }
 
     public string Protocol => "MQTT";
@@ -34,7 +30,6 @@ public class MqttDataSender : IDataSender, IDisposable
     {
         await EnsureConnectedAsync(cancellationToken);
 
-        // Tworzenie wiadomości jest w bezpiecznym miejscu - zawsze użyje najnowszego _config.TopicOrPath
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(_config.TopicOrPath)
             .WithPayload(payload)
@@ -45,22 +40,27 @@ public class MqttDataSender : IDataSender, IDisposable
 
     private async Task EnsureConnectedAsync(CancellationToken cancellationToken)
     {
+        if (_mqttClient.IsConnected && !string.Equals(_lastConnectedAddress, _config.TargetAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation("Wykryto zmianę adresu. Rozłączanie z {Old} i łączenie z {New}", _lastConnectedAddress, _config.TargetAddress);
+            await _mqttClient.DisconnectAsync(new MqttClientDisconnectOptions(), cancellationToken);
+        }
+
         if (!_mqttClient.IsConnected)
         {
-            // 3. KLUCZOWA ZMIANA: Budujemy opcje tuż przed połączeniem.
-            // Dzięki temu sender zawsze użyje adresu, który obecnie widnieje w panelu sterowania.
             var dynamicOptions = new MqttClientOptionsBuilder()
                 .WithTcpServer(_config.TargetAddress)
                 .Build();
 
             _logger.LogInformation("Nawiązywanie połączenia z brokerem MQTT: {Address}", _config.TargetAddress);
             await _mqttClient.ConnectAsync(dynamicOptions, cancellationToken);
+
+            _lastConnectedAddress = _config.TargetAddress;
         }
     }
 
     public void Dispose()
     {
-        // rozłączamy brokera MQTT
         _mqttClient?.Dispose();
     }
 }

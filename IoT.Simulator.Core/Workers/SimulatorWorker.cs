@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using IoT.Simulator.Core.Configuration;
+﻿using IoT.Simulator.Core.Configuration;
 using IoT.Simulator.Core.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -37,29 +32,23 @@ public class SimulatorWorker : BackgroundService
         {
             try
             {
-                // Pobranie danych
                 var payload = await _dataProvider.GetNextPayloadAsync(stoppingToken);
 
-                if (!string.IsNullOrEmpty(payload))
+                // Zabezpieczenie przed pustymi ramkami po zmianie struktury danych
+                if (!string.IsNullOrWhiteSpace(payload))
                 {
-                    // Pobranie aktualnego protokołu
                     var activeSender = _senders.FirstOrDefault(s =>
                         s.Protocol.Equals(_currentConfig.Protocol, StringComparison.OrdinalIgnoreCase));
 
                     if (activeSender != null)
                     {
-                        // Wysłanie danych przy użyciu wybranego protokołu
                         await activeSender.SendAsync(payload, stoppingToken);
-                        _logger.LogInformation("[{Protocol}] Wysłano pakiet danych.", activeSender.Protocol);
+                        _logger.LogInformation("[{Protocol}] Wysłano pakiet danych na temat/ścieżkę: {Topic}", activeSender.Protocol, _currentConfig.TopicOrPath);
                     }
                     else
                     {
                         _logger.LogWarning("Brak strategii wysyłki dla protokołu: {Protocol}", _currentConfig.Protocol);
                     }
-                }
-                else
-                {
-                    _logger.LogWarning("Otrzymano pusty pakiet z dostawcy danych.");
                 }
             }
             catch (Exception ex)
@@ -67,8 +56,14 @@ public class SimulatorWorker : BackgroundService
                 _logger.LogError(ex, "Błąd podczas cyklu pracy symulatora.");
             }
 
-            // Pobranie aktualnego interwału z konfiguracji przed kolejnym cyklem
-            await Task.Delay(_currentConfig.IntervalMilliseconds, stoppingToken);
+            int waitedMilliseconds = 0;
+            int stepMilliseconds = 100;
+
+            while (waitedMilliseconds < _currentConfig.IntervalMilliseconds && !stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(stepMilliseconds, stoppingToken);
+                waitedMilliseconds += stepMilliseconds;
+            }
         }
     }
 }

@@ -3,60 +3,65 @@ using IoT.Simulator.Core.Interfaces;
 using IoT.Simulator.Core.Providers;
 using IoT.Simulator.Core.Senders;
 using IoT.Simulator.Core.Workers;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Mvc;
+using System.Text.Json.Serialization;
 
-// 1. Zmiana na WebApplicationBuilder, aby obs³u¿yæ ¿¹dania HTTP (REST API)
 var builder = WebApplication.CreateBuilder(args);
 
-// 2. £adowanie konfiguracji z pliku
+// 1. Konfiguracja JSON
+builder.Services.ConfigureHttpJsonOptions(options => {
+    options.SerializerOptions.PropertyNameCaseInsensitive = true;
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
+// 2. £adowanie stanu pocz¹tkowego
 var configState = builder.Configuration
     .GetSection(SimulatorConfig.SectionName)
     .Get<SimulatorConfig>() ?? new SimulatorConfig();
 
-// Dodajemy nasz obiekt konfiguracji do kontenera. 
-// Worker i nasze API bêd¹ wspó³dzieliæ dok³adnie ten SAM obiekt w pamiêci.
 builder.Services.AddSingleton(configState);
 
-// 3. Rejestracja Providera (Odczyt CSV)
+// 3. Rejestracja us³ug rdzeniowych
 builder.Services.AddSingleton<IDataProvider, CsvFileDataProvider>();
-
-// 4. Rejestracja WSZYSTKICH strategii wysy³ki naraz
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IDataSender, HttpDataSender>();
 builder.Services.AddSingleton<IDataSender, MqttDataSender>();
-
-// 5. Rejestracja naszego silnika pracuj¹cego w tle
 builder.Services.AddHostedService<SimulatorWorker>();
+
 
 var app = builder.Build();
 
-// ==========================================
-// INTERFEJS ZARZ¥DCZY (REST API)
-// ==========================================
+app.MapGet("/api/config", (SimulatorConfig currentConfig) => Results.Ok(currentConfig));
 
-// Endpoint 1: Pobieranie obecnej konfiguracji
-app.MapGet("/api/config", (SimulatorConfig currentConfig) =>
+app.MapPut("/api/config", (
+    [FromBody] SimulatorConfig incoming,
+    [FromServices] SimulatorConfig singletonConfig,
+    ILogger<Program> logger) =>
 {
-    return Results.Ok(currentConfig);
+    if (incoming.IntervalMilliseconds < 1)
+        return Results.BadRequest("Interwa³ nie mo¿e byæ krótszy ni¿ 1ms.");
+
+    if (string.IsNullOrWhiteSpace(incoming.TargetAddress))
+        return Results.BadRequest("Adres docelowy nie mo¿e byæ pusty.");
+
+    if (string.IsNullOrWhiteSpace(incoming.TopicOrPath))
+        return Results.BadRequest("Œcie¿ka (dla HTTP) lub temat (dla MQTT) nie mo¿e byæ pusta.");
+
+    if (!incoming.Protocol.Equals("HTTP", StringComparison.OrdinalIgnoreCase) &&
+        !incoming.Protocol.Equals("MQTT", StringComparison.OrdinalIgnoreCase))
+        return Results.BadRequest("Obs³ugiwane protoko³y to wy³¹cznie HTTP lub MQTT.");
+
+    logger.LogInformation("Zdalna aktualizacja z Panelu: Interval={Interval}, Protocol={Protocol}, Target={Target}",
+        incoming.IntervalMilliseconds, incoming.Protocol.ToUpper(), incoming.TargetAddress);
+
+    singletonConfig.Protocol = incoming.Protocol.ToUpper();
+    singletonConfig.IntervalMilliseconds = incoming.IntervalMilliseconds;
+    singletonConfig.TargetAddress = incoming.TargetAddress;
+    singletonConfig.TopicOrPath = incoming.TopicOrPath;
+
+    return Results.Ok(singletonConfig);
 });
 
-// Endpoint 2: Aktualizacja konfiguracji w locie
-app.MapPost("/api/config", (SimulatorConfig newConfig, SimulatorConfig currentConfig) =>
-{
-    // Aktualizujemy w³aœciwoœci naszego Singletona w pamiêci RAM
-    currentConfig.Protocol = newConfig.Protocol;
-    currentConfig.IntervalMilliseconds = newConfig.IntervalMilliseconds;
-    currentConfig.TargetAddress = newConfig.TargetAddress;
-    currentConfig.TopicOrPath = newConfig.TopicOrPath;
-
-    return Results.Ok(new
-    {
-        Message = "Konfiguracja zmieniona na ¿ywo!",
-        CurrentState = currentConfig
-    });
-});
+app.MapGet("/", () => Results.Ok("Symulator IoT pracuje w tle. API dostêpne tylko do u¿ytku wewnêtrznego."));
 
 app.Run();
