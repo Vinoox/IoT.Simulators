@@ -26,7 +26,7 @@ public class RegistryClient
         _logger = logger;
 
         // Zmienne z appsettings.json każdego symulatora
-        _controlPanelUrl = configuration["ControlPanelUrl"] ?? "http://localhost:5000";
+        _controlPanelUrl = configuration["ControlPanelUrl"] ?? "https://localhost:7251";
         _serviceId = configuration["ServiceId"] ?? "Unknown";
         _myBaseUrl = configuration["ASPNETCORE_URLS"]?.Split(';').FirstOrDefault() ?? "http://localhost";
     }
@@ -44,7 +44,8 @@ public class RegistryClient
                 TopicOrPath = _config.TopicOrPath,
                 IntervalMilliseconds = _config.IntervalMilliseconds,
                 IsRunning = _config.IsRunning,
-                LastUpdated = DateTime.UtcNow
+                LastUpdated = DateTime.UtcNow,
+                ProcessedMessages = _config.ProcessedMessages
             };
 
             var client = _httpClientFactory.CreateClient();

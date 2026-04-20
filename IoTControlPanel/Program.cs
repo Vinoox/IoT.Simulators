@@ -29,8 +29,6 @@ app.UseStaticFiles();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-//app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
-
 // ==========================================
 // ENDPOINT 1: ZMIANA INTERWA£U
 // ==========================================
@@ -97,16 +95,6 @@ app.MapPost("/api/control/switch-to-mqtt", async (
 })
 .WithTags("Sterowanie")
 .WithSummary("Konfiguruje wysy³kê danych przez protokó³ MQTT");
-
-// ==========================================
-// KOLEKTOR DANYCH (Odbiornik testowy)
-// ==========================================
-app.MapPost("/api/collect/{sector}", (string sector, object data, ILogger<Program> logger) =>
-{
-    logger.LogInformation(" >>> [{Sector}] Otrzymano: {Data}", sector.ToUpper(), data);
-    return Results.Accepted();
-})
-.WithTags("Kolektor");
 
 // ==========================================
 // ENDPOINT 3A: WZNOWIENIE NADAWANIA (START)

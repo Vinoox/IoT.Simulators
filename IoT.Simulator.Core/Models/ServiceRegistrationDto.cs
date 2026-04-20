@@ -10,4 +10,5 @@ public class ServiceRegistrationDto
     public int IntervalMilliseconds { get; set; }
     public bool IsRunning { get; set; }
     public DateTime LastUpdated { get; set; }
+    public int ProcessedMessages { get; set; }
 }

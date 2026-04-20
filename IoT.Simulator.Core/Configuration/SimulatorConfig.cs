@@ -10,4 +10,5 @@ public class SimulatorConfig
     public int IntervalMilliseconds { get; set; } = 9999;
     public string DataFilePath { get; set; } = string.Empty;
     public bool IsRunning { get; set; } = true;
+    public int ProcessedMessages { get; set; } = 0;
 }
