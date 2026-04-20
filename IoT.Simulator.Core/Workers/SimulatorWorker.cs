@@ -28,49 +28,43 @@ public class SimulatorWorker : BackgroundService
     {
         _logger.LogInformation("Silnik IoT wystartował. Początkowy interwał: {Interval}ms", _currentConfig.IntervalMilliseconds);
 
-        while (!stoppingToken.IsCancellationRequested)
+        // POPRAWKA: Użycie wbudowanego, bardzo precyzyjnego timera
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_currentConfig.IntervalMilliseconds));
+
+        while (await timer.WaitForNextTickAsync(stoppingToken))
         {
             try
             {
-                // SPRAWDZENIE FLAGI - wykonujemy logikę tylko, gdy symulator "działa"
+                var currentInterval = TimeSpan.FromMilliseconds(_currentConfig.IntervalMilliseconds);
+                if (timer.Period != currentInterval)
+                {
+                    timer.Period = currentInterval;
+                }
+
                 if (_currentConfig.IsRunning)
                 {
                     var payload = await _dataProvider.GetNextPayloadAsync(stoppingToken);
 
-                    if (!string.IsNullOrWhiteSpace(payload))
-                    {
-                        var activeSender = _senders.FirstOrDefault(s =>
-                            s.Protocol.Equals(_currentConfig.Protocol, StringComparison.OrdinalIgnoreCase));
+                    if (string.IsNullOrWhiteSpace(payload))
+                        continue;
 
-                        if (activeSender != null)
-                        {
-                            await activeSender.SendAsync(payload, stoppingToken);
-                            _logger.LogInformation("[{Protocol}] Wysłano pakiet danych na temat/ścieżkę: {Topic}", activeSender.Protocol, _currentConfig.TopicOrPath);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Brak strategii wysyłki dla protokołu: {Protocol}", _currentConfig.Protocol);
-                        }
+                    var activeSender = _senders.FirstOrDefault(s =>
+                        s.Protocol.Equals(_currentConfig.Protocol, StringComparison.OrdinalIgnoreCase));
+
+                    if (activeSender != null)
+                    {
+                        await activeSender.SendAsync(payload, stoppingToken);
+                        _logger.LogInformation("[{Protocol}] Wysłano pakiet na: {Topic}", activeSender.Protocol, _currentConfig.TopicOrPath);
                     }
-                }
-                else
-                {
-                    _logger.LogDebug("Symulator jest wstrzymany. Oczekiwanie...");
+                    else
+                    {
+                        _logger.LogWarning("Brak strategii wysyłki dla protokołu: {Protocol}", _currentConfig.Protocol);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Błąd podczas cyklu pracy symulatora.");
-            }
-
-            // PĘTLA OPÓŹNIAJĄCA (działa niezależnie od tego, czy symulator jest zapauzowany)
-            int waitedMilliseconds = 0;
-            int stepMilliseconds = 100;
-
-            while (waitedMilliseconds < _currentConfig.IntervalMilliseconds && !stoppingToken.IsCancellationRequested)
-            {
-                await Task.Delay(stepMilliseconds, stoppingToken);
-                waitedMilliseconds += stepMilliseconds;
             }
         }
     }

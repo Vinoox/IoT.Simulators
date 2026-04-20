@@ -15,7 +15,7 @@ public class CsvFileDataProvider : IDataProvider, IDisposable
     private readonly ILogger<CsvFileDataProvider> _logger;
     private readonly IHostEnvironment _env;
     private StreamReader? _reader;
-    private bool _isFileValid = true;
+    private bool _isFileValid = false;
 
     public CsvFileDataProvider(SimulatorConfig config, ILogger<CsvFileDataProvider> logger, IHostEnvironment env)
     {
@@ -27,41 +27,30 @@ public class CsvFileDataProvider : IDataProvider, IDisposable
 
     private void InitializeReader()
     {
-        try
+        var fullPath = Path.Combine(_env.ContentRootPath, _config.DataFilePath);
+        var fileInfo = new FileInfo(fullPath);
+
+        if (fileInfo.Exists && fileInfo.Length > 0)
         {
-            string fullPath = Path.Combine(_env.ContentRootPath, _config.DataFilePath);
-
-            _logger.LogInformation("Szukam pliku pod adresem: {Path}", fullPath);
-
-            if (File.Exists(fullPath))
-            {
-                _reader = new StreamReader(fullPath);
-                _logger.LogInformation("SUKCES! System widzi plik i zaczyna nadawanie.");
-                _isFileValid = true;
-            }
-            else
-            {
-                _logger.LogWarning("PLIKU NADAL NIE MA! Sprawdź ścieżkę: {Path}", fullPath);
-                _isFileValid = false;
-            }
+            var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            _reader = new StreamReader(fileStream);
+            _isFileValid = true;
+            _logger.LogInformation("SUKCES! Plik załadowany: {Path}", fullPath);
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogError(ex, "Błąd krytyczny podczas otwierania pliku.");
-            _isFileValid = false;
+            _logger.LogWarning("BŁĄD: Plik danych nie istnieje lub jest pusty. Ścieżka: {Path}", fullPath);
         }
     }
 
     public async Task<string> GetNextPayloadAsync(CancellationToken cancellationToken)
     {
-        if (!_isFileValid || _reader == null)
-            return string.Empty;
+        if (!_isFileValid || _reader == null) return string.Empty;
 
         var line = await _reader.ReadLineAsync(cancellationToken);
 
         if (line == null)
         {
-            _logger.LogDebug("Osiągnięto koniec pliku. Zapętlam strumień od nowa.");
             _reader.BaseStream.Position = 0;
             _reader.DiscardBufferedData();
             line = await _reader.ReadLineAsync(cancellationToken);

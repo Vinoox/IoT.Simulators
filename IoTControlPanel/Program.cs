@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json.Serialization;
 using IoT.Simulator.Core.Configuration;
 using IoT.Simulator.Core.Models;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,8 @@ builder.Services.AddSwaggerGen(c => {
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IoTControlPanel.Services.ServiceRegistry>();
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.UseDefaultFiles();
@@ -28,6 +31,8 @@ app.UseStaticFiles();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.MapHub<RegistryHub>("/registryHub");
 
 // ==========================================
 // ENDPOINT 1: ZMIANA INTERWA£U
@@ -136,15 +141,20 @@ app.MapPost("/api/control/stop", async (
 .WithTags("Sterowanie")
 .WithSummary("Zatrzymuje nadawanie danych w symulatorze");
 
-app.MapPost("/api/registry/push", (
+app.MapPost("/api/registry/push", async (
     ServiceRegistrationDto state,
-    IoTControlPanel.Services.ServiceRegistry registry) =>
+    IoTControlPanel.Services.ServiceRegistry registry,
+    IHubContext<RegistryHub> hubContext) =>
 {
     registry.UpdateService(state);
+
+    // Rozes³anie zaktualizowanej listy do wszystkich po³¹czonych przegl¹darek
+    await hubContext.Clients.All.SendAsync("ReceiveRegistryUpdate", registry.GetAllServices());
+
     return Results.Ok();
 })
 .WithTags("Registry")
-.ExcludeFromDescription(); // Opcjonalnie ukryj w Swaggerze
+.ExcludeFromDescription();
 
 app.MapGet("/api/registry/services", (IoTControlPanel.Services.ServiceRegistry registry) =>
 {
@@ -152,6 +162,7 @@ app.MapGet("/api/registry/services", (IoTControlPanel.Services.ServiceRegistry r
 })
 .WithTags("Registry")
 .WithSummary("Zwraca pe³ny, aktualny stan wszystkich pod³¹czonych symulatorów");
+
 
 app.Run();
 
@@ -194,3 +205,7 @@ async Task<IResult> UpdateRemoteConfig(string targetUrl, IHttpClientFactory fact
 }
 
 public enum TargetService { SmartCity, SmartGrid, Agriculture, Logistics, Healthcare }
+
+public class RegistryHub : Hub
+{
+}

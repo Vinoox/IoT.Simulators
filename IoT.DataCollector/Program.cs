@@ -20,7 +20,7 @@ var app = builder.Build();
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var registryClient = app.Services.GetRequiredService<RegistryClient>();
-    var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+    var timer = new PeriodicTimer(TimeSpan.FromSeconds(0.5));
 
     _ = Task.Run(async () =>
     {
@@ -35,15 +35,29 @@ app.Lifetime.ApplicationStarted.Register(() =>
 
 int _totalPackets = 0;
 
-app.MapPost("/api/collect/{sector}", (string sector, object data, SimulatorConfig config, ILogger<Program> logger) => {
+app.MapPost("/api/collect/{sector}", async (string sector, HttpRequest request, SimulatorConfig config) => {
 
     Interlocked.Increment(ref _totalPackets);
     config.ProcessedMessages = _totalPackets;
 
-    if (_totalPackets % 10 == 0)
+    // 1. Odczytanie czystej zawartoœci (³adunku json) prosto ze strumienia HTTP
+    using var reader = new StreamReader(request.Body);
+    var payload = await reader.ReadToEndAsync();
+
+    // Zabezpieczenie na wypadek pustego ¿¹dania
+    if (string.IsNullOrWhiteSpace(payload))
     {
-        logger.LogInformation(">>> [DATA COLLECTOR] Odebrano ³¹cznie pakietów: {Count}", _totalPackets);
+        payload = "Pusty ³adunek";
     }
+
+    // 2. Obliczenie dok³adnego rozmiaru w bajtach
+    var byteCount = System.Text.Encoding.UTF8.GetByteCount(payload);
+
+    // 3. Rysowanie logu w konsoli w identycznym formacie jak MQTT
+    Console.WriteLine($"[MSG] Œcie¿ka: {request.Path} | Rozmiar: {byteCount} bajtów");
+    Console.ForegroundColor = ConsoleColor.DarkGray;
+    Console.WriteLine($"      Treœæ: {payload}");
+    Console.ResetColor();
 
     return Results.Accepted();
 });

@@ -19,18 +19,32 @@ builder.Services.AddSingleton(new SimulatorConfig
     Protocol = "MQTT Broker",
     TargetAddress = "localhost",
     TopicOrPath = "Port: 1883",
-    IsRunning = true
+    IsRunning = true,
+    ProcessedMessages = 0 // Inicjalizacja licznika
 });
 
 builder.Services.AddSingleton<RegistryClient>();
 
 var app = builder.Build();
 
-// Wysłanie statusu do Panelu przy starcie aplikacji
+// POBIERAMY OBIEKT KONFIGURACJI, BY MÓC ZMIENIAĆ JEGO STAN
+var brokerConfig = app.Services.GetRequiredService<SimulatorConfig>();
+
+// Wysłanie statusu do Panelu przy starcie aplikacji ORAZ CYKLICZNIE (jak w DataCollector)
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var registryClient = app.Services.GetRequiredService<RegistryClient>();
-    _ = Task.Run(() => registryClient.PushStateAsync());
+    var timer = new PeriodicTimer(TimeSpan.FromSeconds(0.5)); // Synchronizacja co 2 sekundy
+
+    _ = Task.Run(async () =>
+    {
+        await registryClient.PushStateAsync(); // Pierwsze wysłanie stanu
+
+        while (await timer.WaitForNextTickAsync())
+        {
+            await registryClient.PushStateAsync(); // Cykliczne wysyłanie stanu
+        }
+    });
 });
 
 // 2. KONFIGURACJA I INICJALIZACJA BROKERA MQTT
@@ -42,7 +56,7 @@ var mqttServerOptions = new MqttServerOptionsBuilder()
 
 var mqttServer = mqttFactory.CreateMqttServer(mqttServerOptions);
 
-// Nasłuchiwanie zdarzeń (Twoja dotychczasowa logika logowania)
+// Nasłuchiwanie zdarzeń
 mqttServer.ClientConnectedAsync += e =>
 {
     Console.ForegroundColor = ConsoleColor.Green;
@@ -56,6 +70,9 @@ mqttServer.InterceptingPublishAsync += e =>
     var payload = e.ApplicationMessage.PayloadSegment.Count > 0
         ? Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment)
         : "Pusty ładunek";
+
+    // INKREMENTACJA LICZNIKA PRZETWORZONYCH WIADOMOŚCI
+    brokerConfig.ProcessedMessages++;
 
     Console.WriteLine($"[MSG] Temat: {e.ApplicationMessage.Topic} | Rozmiar: {e.ApplicationMessage.PayloadSegment.Count} bajtów");
     Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -81,13 +98,12 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     }
 });
 
-// Zatrzymanie brokera przy zamykaniu aplikacji (np. po wciśnięciu Ctrl+C)
+// Zatrzymanie brokera przy zamykaniu aplikacji
 app.Lifetime.ApplicationStopping.Register(async () =>
 {
     Console.WriteLine("Zatrzymywanie brokera...");
     await mqttServer.StopAsync();
 });
 
-// 3. URUCHOMIENIE (Blokuje proces, zastępuje wysłużone Console.ReadLine)
-// Podajemy fikcyjny port (np. 5099) dla pustej powłoki webowej, aby nie kolidował z niczym innym
+// 3. URUCHOMIENIE
 app.Run("http://localhost:5099");

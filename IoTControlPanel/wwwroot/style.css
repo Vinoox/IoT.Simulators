@@ -64,55 +64,49 @@
         transform: scale(0.97);
     }
 
-/* === ANIMACJE PULSOWANIA DLA STATUSÓW === */
+/* === ANIMACJE "ODDYCHANIA" DLA STATUSÓW === */
 .status-dot {
-    height: 12px;
-    width: 12px;
+    height: 10px;
+    width: 10px;
     background-color: #10b981; /* Zielony */
     border-radius: 50%;
     display: inline-block;
     margin-right: 8px;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    animation: pulse-green 2s infinite;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    animation: breathing-green 3s ease-in-out infinite;
 }
 
     .status-dot.stopped {
         background-color: #f59e0b; /* Pomarańczowy */
-        animation: pulse-yellow 2s infinite;
-        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+        animation: breathing-yellow 3s ease-in-out infinite;
     }
 
-@keyframes pulse-green {
-    0% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    }
-
-    70% {
+@keyframes breathing-green {
+    0%, 100% {
         transform: scale(1);
-        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+        opacity: 1;
     }
 
-    100% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    50% {
+        transform: scale(1.2);
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+        opacity: 0.8;
     }
 }
 
-@keyframes pulse-yellow {
-    0% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
-    }
-
-    70% {
+@keyframes breathing-yellow {
+    0%, 100% {
         transform: scale(1);
-        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+        opacity: 1;
     }
 
-    100% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    50% {
+        transform: scale(1.2);
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
+        opacity: 0.8;
     }
 }
 
@@ -123,4 +117,15 @@
     right: 20px;
     z-index: 1050;
     max-width: 350px;
+}
+
+/* Specyficzne kolory dla protokołów */
+.badge-http {
+    background-color: #3b82f6 !important; /* Niebieski - Azure */
+    color: white;
+}
+
+.badge-mqtt {
+    background-color: #6366f1 !important; /* Indygo/Fiolet - MQTT */
+    color: white;
 }
