@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Konfiguracja serializacji JSON dla Enumów
 builder.Services.ConfigureHttpJsonOptions(options => {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
@@ -15,10 +14,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options => {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => {
-    c.SwaggerDoc("v1", new() { Title = "IoT Control Panel", Version = "v2" });
-});
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IoTControlPanel.Services.ServiceRegistry>();
 
@@ -28,9 +23,6 @@ var app = builder.Build();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
-
-app.UseSwagger();
-app.UseSwaggerUI();
 
 app.MapHub<RegistryHub>("/registryHub");
 
@@ -51,9 +43,7 @@ app.MapPost("/api/control/update-interval", async (
     {
         config.IntervalMilliseconds = intervalMs;
     });
-})
-.WithTags("Sterowanie")
-.WithSummary("Zmienia tylko czêstotliwoœæ nadawania (ms)");
+});
 
 // ==========================================
 // ENDPOINT 2A: PRZE£¥CZ NA HTTP (Opcja 2)
@@ -74,9 +64,7 @@ app.MapPost("/api/control/switch-to-http", async (
         config.TargetAddress = targetAddress;
         config.TopicOrPath = apiPath;
     });
-})
-.WithTags("Sterowanie")
-.WithSummary("Konfiguruje wysy³kê danych przez protokó³ HTTP");
+});
 
 // ==========================================
 // ENDPOINT 2B: PRZE£¥CZ NA MQTT (Opcja 2)
@@ -97,9 +85,7 @@ app.MapPost("/api/control/switch-to-mqtt", async (
         config.TargetAddress = brokerAddress;
         config.TopicOrPath = topic;
     });
-})
-.WithTags("Sterowanie")
-.WithSummary("Konfiguruje wysy³kê danych przez protokó³ MQTT");
+});
 
 // ==========================================
 // ENDPOINT 3A: WZNOWIENIE NADAWANIA (START)
@@ -117,9 +103,7 @@ app.MapPost("/api/control/start", async (
     {
         config.IsRunning = true;
     });
-})
-.WithTags("Sterowanie")
-.WithSummary("Wznawia nadawanie danych w symulatorze");
+});
 
 // ==========================================
 // ENDPOINT 3B: ZATRZYMANIE NADAWANIA (STOP)
@@ -137,9 +121,7 @@ app.MapPost("/api/control/stop", async (
     {
         config.IsRunning = false;
     });
-})
-.WithTags("Sterowanie")
-.WithSummary("Zatrzymuje nadawanie danych w symulatorze");
+});
 
 app.MapPost("/api/registry/push", async (
     ServiceRegistrationDto state,
@@ -152,16 +134,12 @@ app.MapPost("/api/registry/push", async (
     await hubContext.Clients.All.SendAsync("ReceiveRegistryUpdate", registry.GetAllServices());
 
     return Results.Ok();
-})
-.WithTags("Registry")
-.ExcludeFromDescription();
+});
 
 app.MapGet("/api/registry/services", (IoTControlPanel.Services.ServiceRegistry registry) =>
 {
     return Results.Ok(registry.GetAllServices());
-})
-.WithTags("Registry")
-.WithSummary("Zwraca pe³ny, aktualny stan wszystkich pod³¹czonych symulatorów");
+});
 
 
 app.Run();

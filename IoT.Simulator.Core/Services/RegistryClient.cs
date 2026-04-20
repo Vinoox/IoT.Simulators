@@ -25,7 +25,6 @@ public class RegistryClient
         _config = config;
         _logger = logger;
 
-        // Zmienne z appsettings.json każdego symulatora
         _controlPanelUrl = configuration["ControlPanelUrl"] ?? "https://localhost:7251";
         _serviceId = configuration["ServiceId"] ?? "Unknown";
         _myBaseUrl = configuration["ASPNETCORE_URLS"]?.Split(';').FirstOrDefault() ?? "http://localhost";
@@ -49,7 +48,7 @@ public class RegistryClient
             };
 
             var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(3); // Fail-fast
+            client.Timeout = TimeSpan.FromSeconds(3);
 
             var response = await client.PostAsJsonAsync($"{_controlPanelUrl}/api/registry/push", payload);
             response.EnsureSuccessStatusCode();
@@ -58,7 +57,6 @@ public class RegistryClient
         }
         catch (Exception ex)
         {
-            // Nie rzucamy błędu dalej, aby nie wywrócić symulatora
             _logger.LogWarning("Nie udało się zaktualizować stanu w Control Panel: {Message}", ex.Message);
         }
     }

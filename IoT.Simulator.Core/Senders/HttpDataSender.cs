@@ -15,14 +15,13 @@ public class HttpDataSender : IDataSender
     private readonly SimulatorConfig _config;
     private readonly ILogger<HttpDataSender> _logger;
 
-    // POPRAWKA: Wstrzykujemy bezpośrednio nasz Singleton (SimulatorConfig)
     public HttpDataSender(
         IHttpClientFactory httpClientFactory,
         SimulatorConfig config,
         ILogger<HttpDataSender> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _config = config; // Przypisujemy bezpośrednio
+        _config = config;
         _logger = logger;
     }
 
@@ -34,8 +33,6 @@ public class HttpDataSender : IDataSender
 
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        // Ponieważ ta linijka wykonuje się w każdej iteracji pętli, 
-        // automatycznie i błyskawicznie złapie nowy adres, jeśli zmienisz go przez Panel Sterowania!
         var url = $"{_config.TargetAddress.TrimEnd('/')}/{_config.TopicOrPath.TrimStart('/')}";
 
         var response = await client.PostAsync(url, content, cancellationToken);

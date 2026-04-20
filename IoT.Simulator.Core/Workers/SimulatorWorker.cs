@@ -28,7 +28,6 @@ public class SimulatorWorker : BackgroundService
     {
         _logger.LogInformation("Silnik IoT wystartował. Początkowy interwał: {Interval}ms", _currentConfig.IntervalMilliseconds);
 
-        // POPRAWKA: Użycie wbudowanego, bardzo precyzyjnego timera
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_currentConfig.IntervalMilliseconds));
 
         while (await timer.WaitForNextTickAsync(stoppingToken))

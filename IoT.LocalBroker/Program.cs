@@ -9,45 +9,42 @@ Console.WriteLine("   LOCAL BROKER MQTT (IoT Simulators)  ");
 Console.WriteLine("=========================================\n");
 
 var builder = WebApplication.CreateBuilder(args);
-
-// 1. KONFIGURACJA ZALEŻNOŚCI DLA REJESTRU
 builder.Services.AddHttpClient();
 
-// Opis brokera, który zostanie wysłany do Panelu Sterowania
-builder.Services.AddSingleton(new SimulatorConfig
-{
-    Protocol = "MQTT Broker",
-    TargetAddress = "localhost",
-    TopicOrPath = "Port: 1883",
-    IsRunning = true,
-    ProcessedMessages = 0 // Inicjalizacja licznika
-});
 
+// Wczytanie stanu początkowego brokera
+var initialConfig = builder.Configuration
+    .GetSection("SimulatorConfig")
+    .Get<SimulatorConfig>() ?? new SimulatorConfig();
+
+builder.Services.AddSingleton(initialConfig);
+
+// Rejestracja usługi wysyłającej stan serwera do Panelu Sterowania
 builder.Services.AddSingleton<RegistryClient>();
 
 var app = builder.Build();
 
-// POBIERAMY OBIEKT KONFIGURACJI, BY MÓC ZMIENIAĆ JEGO STAN
+// Pobranie obiektu konfiguracji z pamięci
 var brokerConfig = app.Services.GetRequiredService<SimulatorConfig>();
 
-// Wysłanie statusu do Panelu przy starcie aplikacji ORAZ CYKLICZNIE (jak w DataCollector)
+// Uruchomienie asynchronicznej pętli cyklicznie raportującej stan do Panelu Sterowania
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var registryClient = app.Services.GetRequiredService<RegistryClient>();
-    var timer = new PeriodicTimer(TimeSpan.FromSeconds(0.5)); // Synchronizacja co 2 sekundy
+    var timer = new PeriodicTimer(TimeSpan.FromSeconds(0.5));
 
     _ = Task.Run(async () =>
     {
-        await registryClient.PushStateAsync(); // Pierwsze wysłanie stanu
+        await registryClient.PushStateAsync();
 
         while (await timer.WaitForNextTickAsync())
         {
-            await registryClient.PushStateAsync(); // Cykliczne wysyłanie stanu
+            await registryClient.PushStateAsync();
         }
     });
 });
 
-// 2. KONFIGURACJA I INICJALIZACJA BROKERA MQTT
+// Konfiguracja serwera MQTT 
 var mqttFactory = new MqttFactory();
 var mqttServerOptions = new MqttServerOptionsBuilder()
     .WithDefaultEndpoint()
@@ -56,7 +53,7 @@ var mqttServerOptions = new MqttServerOptionsBuilder()
 
 var mqttServer = mqttFactory.CreateMqttServer(mqttServerOptions);
 
-// Nasłuchiwanie zdarzeń
+// Obsługa zdarzenia podłączenia nowego urządzenia (symulatora) do brokera
 mqttServer.ClientConnectedAsync += e =>
 {
     Console.ForegroundColor = ConsoleColor.Green;
@@ -65,13 +62,13 @@ mqttServer.ClientConnectedAsync += e =>
     return Task.CompletedTask;
 };
 
+// Przechwytywanie przychodzących wiadomości
 mqttServer.InterceptingPublishAsync += e =>
 {
     var payload = e.ApplicationMessage.PayloadSegment.Count > 0
         ? Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment)
         : "Pusty ładunek";
 
-    // INKREMENTACJA LICZNIKA PRZETWORZONYCH WIADOMOŚCI
     brokerConfig.ProcessedMessages++;
 
     Console.WriteLine($"[MSG] Temat: {e.ApplicationMessage.Topic} | Rozmiar: {e.ApplicationMessage.PayloadSegment.Count} bajtów");
@@ -82,7 +79,7 @@ mqttServer.InterceptingPublishAsync += e =>
     return Task.CompletedTask;
 };
 
-// Start brokera, gdy wystartuje główny proces aplikacji
+// Start serwera MQTT 
 app.Lifetime.ApplicationStarted.Register(async () =>
 {
     try
@@ -98,12 +95,11 @@ app.Lifetime.ApplicationStarted.Register(async () =>
     }
 });
 
-// Zatrzymanie brokera przy zamykaniu aplikacji
+// Zatrzymanie serwera MQTT 
 app.Lifetime.ApplicationStopping.Register(async () =>
 {
     Console.WriteLine("Zatrzymywanie brokera...");
     await mqttServer.StopAsync();
 });
 
-// 3. URUCHOMIENIE
 app.Run("http://localhost:5099");

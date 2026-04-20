@@ -1,8 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using IoT.Simulator.Core.Configuration;
+﻿using IoT.Simulator.Core.Configuration;
 using IoT.Simulator.Core.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -27,11 +23,14 @@ public class CsvFileDataProvider : IDataProvider, IDisposable
 
     private void InitializeReader()
     {
+        // Zbudowanie bezwzględnej ścieżki do pliku na podstawie folderu domowego projektu
         var fullPath = Path.Combine(_env.ContentRootPath, _config.DataFilePath);
         var fileInfo = new FileInfo(fullPath);
 
+        // Zabezpieczenie przed błędem Infinite Loop
         if (fileInfo.Exists && fileInfo.Length > 0)
         {
+            // Otwarcie pliku
             var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             _reader = new StreamReader(fileStream);
             _isFileValid = true;
@@ -43,22 +42,26 @@ public class CsvFileDataProvider : IDataProvider, IDisposable
         }
     }
 
+    // Główna metoda wywoływana cyklicznie przez Worker, zwracająca jedną linijkę danych z pliku
     public async Task<string> GetNextPayloadAsync(CancellationToken cancellationToken)
     {
         if (!_isFileValid || _reader == null) return string.Empty;
 
         var line = await _reader.ReadLineAsync(cancellationToken);
 
+        // Mechanizm zapętlania (Endless Simulation) - po przeczytaniu calego pliku wracamy na poczatek
         if (line == null)
         {
             _reader.BaseStream.Position = 0;
             _reader.DiscardBufferedData();
+
             line = await _reader.ReadLineAsync(cancellationToken);
         }
 
         return line ?? string.Empty;
     }
 
+    // Zwalnianie zasobów
     public void Dispose()
     {
         _reader?.Dispose();

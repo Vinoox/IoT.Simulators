@@ -16,12 +16,6 @@ async function fetchServicesState() {
 
 // Główna funkcja renderująca - inteligentnie aktualizuje tylko zmienione elementy
 function renderServices(services) {
-    // Blokada odświeżania, jeśli użytkownik właśnie coś wpisuje w polach input
-    const activeElement = document.activeElement;
-    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT')) {
-        return;
-    }
-
     const simGrid = document.getElementById('simulatorsGrid');
     const infraGrid = document.getElementById('infraGrid');
     const loadingSpinner = document.getElementById('loadingSpinner');

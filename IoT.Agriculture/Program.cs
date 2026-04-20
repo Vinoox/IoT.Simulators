@@ -9,38 +9,39 @@ using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Konfiguracja JSON
+// Konfiguracja globalna formatu JSON
 builder.Services.ConfigureHttpJsonOptions(options => {
     options.SerializerOptions.PropertyNameCaseInsensitive = true;
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// 2. £adowanie stanu pocz¹tkowego
+// Pobranie pocz¹tkowych ustawieñ symulatora z pliku appsettings.json
 var configState = builder.Configuration
     .GetSection(SimulatorConfig.SectionName)
     .Get<SimulatorConfig>() ?? new SimulatorConfig();
 
+// Rejestracja serwisow
 builder.Services.AddSingleton(configState);
-
-// 3. Rejestracja us³ug rdzeniowych
-builder.Services.AddSingleton<IDataProvider, CsvFileDataProvider>();
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<IDataSender, HttpDataSender>();
-builder.Services.AddSingleton<IDataSender, MqttDataSender>();
-builder.Services.AddHostedService<SimulatorWorker>();
-builder.Services.AddSingleton<RegistryClient>();
-
+builder.Services.AddSingleton<IDataProvider, CsvFileDataProvider>(); // Dostarczyciel danych (z pliku CSV)
+builder.Services.AddHttpClient(); // Klient HTTP dla zapytañ REST
+builder.Services.AddSingleton<IDataSender, HttpDataSender>(); // Modu³ wysy³ki po HTTP
+builder.Services.AddSingleton<IDataSender, MqttDataSender>(); // Modu³ wysy³ki po MQTT
+builder.Services.AddHostedService<SimulatorWorker>(); // G³ówna pêtla symulatora pracuj¹ca w tle
+builder.Services.AddSingleton<RegistryClient>(); // Klient raportuj¹cy stan do panelu
 
 var app = builder.Build();
 
+// Zdarzenie jednorazowe przy starcie: Zg³oszenie swojej obecnoœci do centralnego Panelu Sterowania
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var registryClient = app.Services.GetRequiredService<IoT.Simulator.Core.Services.RegistryClient>();
     _ = Task.Run(() => registryClient.PushStateAsync());
 });
 
+// Endpoint GET: Zwraca aktualn¹ konfiguracjê symulatora
 app.MapGet("/api/config", (SimulatorConfig currentConfig) => Results.Ok(currentConfig));
 
+// Endpoint PUT: Zdalna aktualizacja ustawieñ serwisu
 app.MapPut("/api/config", (
     [FromBody] SimulatorConfig incoming,
     [FromServices] SimulatorConfig singletonConfig,
@@ -68,12 +69,11 @@ app.MapPut("/api/config", (
     singletonConfig.TargetAddress = incoming.TargetAddress;
     singletonConfig.TopicOrPath = incoming.TopicOrPath;
     singletonConfig.IsRunning = incoming.IsRunning;
-    
+
+    // aktualizacja stanu w panelu
     _ = Task.Run(() => registryClient.PushStateAsync());
 
     return Results.Ok(singletonConfig);
 });
-
-app.MapGet("/", () => Results.Ok("Symulator IoT pracuje w tle. API dostêpne tylko do u¿ytku wewnêtrznego."));
 
 app.Run();

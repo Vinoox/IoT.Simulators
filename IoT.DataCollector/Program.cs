@@ -1,22 +1,26 @@
 using IoT.Simulator.Core.Configuration;
 using IoT.Simulator.Core.Services;
 
+// Inicjalizacja aplikacji webowej pe³ni¹cej rolê Kolektora Danych HTTP
 var builder = WebApplication.CreateBuilder(args);
+
+// Rejestracja klienta HTTP niezbêdnego do komunikacji z Panelem Sterowania
 builder.Services.AddHttpClient();
 
-builder.Services.AddSingleton(new SimulatorConfig
-{
-    Protocol = "HTTP Receiver",
-    TargetAddress = "localhost:5088",
-    TopicOrPath = "/api/collect/{sector}",
-    IsRunning = true,
-    ProcessedMessages = 0
-});
+// Wczytanie stanu pocz¹tkowego kolektora
+var initialConfig = builder.Configuration
+    .GetSection("SimulatorConfig")
+    .Get<SimulatorConfig>() ?? new SimulatorConfig();
 
+// Rejestracja konfiguracji jako Singleton
+builder.Services.AddSingleton(initialConfig);
+
+// Rejestracja us³ugi odpowiedzialnej za wysy³anie statystyk do panelu
 builder.Services.AddSingleton<RegistryClient>();
 
 var app = builder.Build();
 
+// raportowanie stanu kolektora do panelu
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var registryClient = app.Services.GetRequiredService<RegistryClient>();
@@ -35,30 +39,30 @@ app.Lifetime.ApplicationStarted.Register(() =>
 
 int _totalPackets = 0;
 
+// Endpoint nas³uchuj¹cy na dane
 app.MapPost("/api/collect/{sector}", async (string sector, HttpRequest request, SimulatorConfig config) => {
 
+    // Bezpieczna dla wielu w¹tków inkrementacja licznika i aktualizacja obiektu konfiguracji
     Interlocked.Increment(ref _totalPackets);
     config.ProcessedMessages = _totalPackets;
 
-    // 1. Odczytanie czystej zawartoœci (³adunku json) prosto ze strumienia HTTP
+    // Pobranie surowej zawartoœci tekstowej (np. JSON) bezpoœrednio ze strumienia wejœciowego
     using var reader = new StreamReader(request.Body);
     var payload = await reader.ReadToEndAsync();
 
-    // Zabezpieczenie na wypadek pustego ¿¹dania
     if (string.IsNullOrWhiteSpace(payload))
     {
         payload = "Pusty ³adunek";
     }
 
-    // 2. Obliczenie dok³adnego rozmiaru w bajtach
     var byteCount = System.Text.Encoding.UTF8.GetByteCount(payload);
 
-    // 3. Rysowanie logu w konsoli w identycznym formacie jak MQTT
     Console.WriteLine($"[MSG] Œcie¿ka: {request.Path} | Rozmiar: {byteCount} bajtów");
     Console.ForegroundColor = ConsoleColor.DarkGray;
     Console.WriteLine($"      Treœæ: {payload}");
     Console.ResetColor();
 
+    // Potwierdzenie dla symulatora, ¿e pakiet zosta³ pomyœlnie odebrany (HTTP 202)
     return Results.Accepted();
 });
 
