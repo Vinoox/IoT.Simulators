@@ -9,4 +9,5 @@ public class SimulatorConfig
     public string TopicOrPath { get; set; } = string.Empty;
     public int IntervalMilliseconds { get; set; } = 9999;
     public string DataFilePath { get; set; } = string.Empty;
+    public bool IsRunning { get; set; } = true;
 }

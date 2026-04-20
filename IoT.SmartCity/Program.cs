@@ -1,10 +1,11 @@
+using System.Text.Json.Serialization;
 using IoT.Simulator.Core.Configuration;
 using IoT.Simulator.Core.Interfaces;
 using IoT.Simulator.Core.Providers;
 using IoT.Simulator.Core.Senders;
+using IoT.Simulator.Core.Services;
 using IoT.Simulator.Core.Workers;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,15 +28,23 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IDataSender, HttpDataSender>();
 builder.Services.AddSingleton<IDataSender, MqttDataSender>();
 builder.Services.AddHostedService<SimulatorWorker>();
+builder.Services.AddSingleton<RegistryClient>();
 
 
 var app = builder.Build();
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var registryClient = app.Services.GetRequiredService<RegistryClient>();
+    _ = registryClient.PushStateAsync(); // Fire and forget
+});
 
 app.MapGet("/api/config", (SimulatorConfig currentConfig) => Results.Ok(currentConfig));
 
 app.MapPut("/api/config", (
     [FromBody] SimulatorConfig incoming,
     [FromServices] SimulatorConfig singletonConfig,
+    [FromServices] RegistryClient registryClient,
     ILogger<Program> logger) =>
 {
     if (incoming.IntervalMilliseconds < 1)
@@ -58,6 +67,9 @@ app.MapPut("/api/config", (
     singletonConfig.IntervalMilliseconds = incoming.IntervalMilliseconds;
     singletonConfig.TargetAddress = incoming.TargetAddress;
     singletonConfig.TopicOrPath = incoming.TopicOrPath;
+    singletonConfig.IsRunning = incoming.IsRunning;
+
+    _ = Task.Run(() => registryClient.PushStateAsync());
 
     return Results.Ok(singletonConfig);
 });

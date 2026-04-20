@@ -1,6 +1,7 @@
-using IoT.Simulator.Core.Configuration;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
+using IoT.Simulator.Core.Configuration;
+using IoT.Simulator.Core.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,13 +19,17 @@ builder.Services.AddSwaggerGen(c => {
     c.SwaggerDoc("v1", new() { Title = "IoT Control Panel", Version = "v2" });
 });
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IoTControlPanel.Services.ServiceRegistry>();
 
 var app = builder.Build();
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+//app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
 // ==========================================
 // ENDPOINT 1: ZMIANA INTERWA£U
@@ -102,6 +107,63 @@ app.MapPost("/api/collect/{sector}", (string sector, object data, ILogger<Progra
     return Results.Accepted();
 })
 .WithTags("Kolektor");
+
+// ==========================================
+// ENDPOINT 3A: WZNOWIENIE NADAWANIA (START)
+// ==========================================
+app.MapPost("/api/control/start", async (
+    TargetService service,
+    IHttpClientFactory clientFactory,
+    IConfiguration configuration) =>
+{
+    string? targetUrl = configuration.GetValue<string>($"ServiceUrls:{service}");
+    if (string.IsNullOrEmpty(targetUrl))
+        return Results.NotFound($"Nie znaleziono adresu dla {service}");
+
+    return await UpdateRemoteConfig(targetUrl, clientFactory, config =>
+    {
+        config.IsRunning = true;
+    });
+})
+.WithTags("Sterowanie")
+.WithSummary("Wznawia nadawanie danych w symulatorze");
+
+// ==========================================
+// ENDPOINT 3B: ZATRZYMANIE NADAWANIA (STOP)
+// ==========================================
+app.MapPost("/api/control/stop", async (
+    TargetService service,
+    IHttpClientFactory clientFactory,
+    IConfiguration configuration) =>
+{
+    string? targetUrl = configuration.GetValue<string>($"ServiceUrls:{service}");
+    if (string.IsNullOrEmpty(targetUrl))
+        return Results.NotFound($"Nie znaleziono adresu dla {service}");
+
+    return await UpdateRemoteConfig(targetUrl, clientFactory, config =>
+    {
+        config.IsRunning = false;
+    });
+})
+.WithTags("Sterowanie")
+.WithSummary("Zatrzymuje nadawanie danych w symulatorze");
+
+app.MapPost("/api/registry/push", (
+    ServiceRegistrationDto state,
+    IoTControlPanel.Services.ServiceRegistry registry) =>
+{
+    registry.UpdateService(state);
+    return Results.Ok();
+})
+.WithTags("Registry")
+.ExcludeFromDescription(); // Opcjonalnie ukryj w Swaggerze
+
+app.MapGet("/api/registry/services", (IoTControlPanel.Services.ServiceRegistry registry) =>
+{
+    return Results.Ok(registry.GetAllServices());
+})
+.WithTags("Registry")
+.WithSummary("Zwraca pe³ny, aktualny stan wszystkich pod³¹czonych symulatorów");
 
 app.Run();
 

@@ -32,23 +32,30 @@ public class SimulatorWorker : BackgroundService
         {
             try
             {
-                var payload = await _dataProvider.GetNextPayloadAsync(stoppingToken);
-
-                // Zabezpieczenie przed pustymi ramkami po zmianie struktury danych
-                if (!string.IsNullOrWhiteSpace(payload))
+                // SPRAWDZENIE FLAGI - wykonujemy logikę tylko, gdy symulator "działa"
+                if (_currentConfig.IsRunning)
                 {
-                    var activeSender = _senders.FirstOrDefault(s =>
-                        s.Protocol.Equals(_currentConfig.Protocol, StringComparison.OrdinalIgnoreCase));
+                    var payload = await _dataProvider.GetNextPayloadAsync(stoppingToken);
 
-                    if (activeSender != null)
+                    if (!string.IsNullOrWhiteSpace(payload))
                     {
-                        await activeSender.SendAsync(payload, stoppingToken);
-                        _logger.LogInformation("[{Protocol}] Wysłano pakiet danych na temat/ścieżkę: {Topic}", activeSender.Protocol, _currentConfig.TopicOrPath);
+                        var activeSender = _senders.FirstOrDefault(s =>
+                            s.Protocol.Equals(_currentConfig.Protocol, StringComparison.OrdinalIgnoreCase));
+
+                        if (activeSender != null)
+                        {
+                            await activeSender.SendAsync(payload, stoppingToken);
+                            _logger.LogInformation("[{Protocol}] Wysłano pakiet danych na temat/ścieżkę: {Topic}", activeSender.Protocol, _currentConfig.TopicOrPath);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Brak strategii wysyłki dla protokołu: {Protocol}", _currentConfig.Protocol);
+                        }
                     }
-                    else
-                    {
-                        _logger.LogWarning("Brak strategii wysyłki dla protokołu: {Protocol}", _currentConfig.Protocol);
-                    }
+                }
+                else
+                {
+                    _logger.LogDebug("Symulator jest wstrzymany. Oczekiwanie...");
                 }
             }
             catch (Exception ex)
@@ -56,6 +63,7 @@ public class SimulatorWorker : BackgroundService
                 _logger.LogError(ex, "Błąd podczas cyklu pracy symulatora.");
             }
 
+            // PĘTLA OPÓŹNIAJĄCA (działa niezależnie od tego, czy symulator jest zapauzowany)
             int waitedMilliseconds = 0;
             int stepMilliseconds = 100;
 
