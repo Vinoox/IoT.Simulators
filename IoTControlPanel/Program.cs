@@ -46,7 +46,7 @@ app.MapPost("/api/control/update-interval", async (
 });
 
 // ==========================================
-// ENDPOINT 2A: PRZE£¥CZ NA HTTP (Opcja 2)
+// ENDPOINT 2A: PRZE£¥CZ NA HTTP
 // ==========================================
 app.MapPost("/api/control/switch-to-http", async (
     TargetService service,
@@ -67,7 +67,7 @@ app.MapPost("/api/control/switch-to-http", async (
 });
 
 // ==========================================
-// ENDPOINT 2B: PRZE£¥CZ NA MQTT (Opcja 2)
+// ENDPOINT 2B: PRZE£¥CZ NA MQTT
 // ==========================================
 app.MapPost("/api/control/switch-to-mqtt", async (
     TargetService service,
@@ -88,7 +88,7 @@ app.MapPost("/api/control/switch-to-mqtt", async (
 });
 
 // ==========================================
-// ENDPOINT 3A: WZNOWIENIE NADAWANIA (START)
+// ENDPOINT 3A: WZNOWIENIE NADAWANIA
 // ==========================================
 app.MapPost("/api/control/start", async (
     TargetService service,
@@ -106,7 +106,7 @@ app.MapPost("/api/control/start", async (
 });
 
 // ==========================================
-// ENDPOINT 3B: ZATRZYMANIE NADAWANIA (STOP)
+// ENDPOINT 3B: ZATRZYMANIE NADAWANIA
 // ==========================================
 app.MapPost("/api/control/stop", async (
     TargetService service,
@@ -130,7 +130,6 @@ app.MapPost("/api/registry/push", async (
 {
     registry.UpdateService(state);
 
-    // Rozes³anie zaktualizowanej listy do wszystkich po³¹czonych przegl¹darek
     await hubContext.Clients.All.SendAsync("ReceiveRegistryUpdate", registry.GetAllServices());
 
     return Results.Ok();
